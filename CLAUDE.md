@@ -44,11 +44,12 @@ tests/ui-smoke.mjs                Chrome 원격 조종으로 클릭 흐름 점�
 - **`[hidden]{display:none!important}`** 를 css 에서 빼지 말 것. 쪽지·알림이 `display` 를 갖고 있어 hidden 이 무시되고 닫힌 쪽지가 떠 있었다(실제로 겪음).
 - 구글 시트: Apps Script 웹 앱에 `fetch(POST, 글 본문)` — 머리글을 붙이면 사전 확인(preflight)이 생겨 막힌다. **학년도마다 탭**(`2026학년도`). '다시 쓰기'는 올해 탭만 비운다. 학생을 지워도 시트 줄은 남긴다(보관용 기록). 못 보낸 변경은 질문 문서의 `sheetDirty` 로 표시해 다음 접속 때 다시 보낸다.
 - 학년도 = 3월~이듬해 2월 (`schoolYearOf`).
+- **학년(grade)**: 학생마다 `grade`. 학년을 넣기 전에 만든 명단은 칸이 없어 `studentList` 가 1학년으로 채운다. 반 탭은 학년을 하나 골랐을 때만(전체 학년의 '2반'은 뜻이 없다). `?g=` 는 처음 고를 학년일 뿐 접근 제한이 아니다. 기록 표에 '학년' 칸이 들어가 시트 코드 판을 `SCRIPT_VERSION` 2 로 올렸다 — 저장된 판이 다르면 보내기를 멈추고(`sheetOk`) 다시 연결하라고 한다. HEAD 를 바꾸면 이 판도 올릴 것.
 - **referrer 는 `strict-origin`.** 처음엔 `no-referrer` 였는데, GitHub 가 API 키 감지 메일을 보내 Google Cloud 에서 키를 사이트 주소(HTTP referrer)로 제한하기로 하면서 바꿨다. no-referrer 면 Referer 가 안 가서 제한된 키로 Firebase 요청이 전부 거절된다. strict-origin 은 출처만 보내므로 링크의 ?k=/?c= 열쇠는 여전히 새지 않는다. 시험이 지킨다.
 
 ## 검증 상태
 
-- `node --test tests/*.test.js` 37개 통과, `ui-smoke` 9개 통과.
+- `node --test tests/*.test.js` 38개 통과, `ui-smoke` 12개 통과.
 - 고장을 일부러 넣어 시험이 실제로 잡는지 확인했다: 초안 무시, 입력 중 미루기 제거.
 - **보안 규칙은 에뮬레이터로 돌려 보지 못했다.** 이 PC 에 Java 가 없다. 정적 검사만 있다.
   - JDK 를 깔면 `@firebase/rules-unit-testing` 으로 시험을 짜는 것이 다음 일순위다.

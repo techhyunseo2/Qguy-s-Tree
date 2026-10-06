@@ -1,10 +1,10 @@
 // 질문 등록 화면 (ask.html?c=반코드)
-import { $, esc, today, param, studentList, sortStudents, withDefaults, fatal, errorText, keepFocus, typingIn } from './common.js';
+import { $, esc, today, param, studentList, sortStudents, gradesOf, bansOf, withDefaults, fatal, errorText, keepFocus, typingIn } from './common.js';
 import { treeSVG } from './tree-draw.js';
 import * as store from './store.js';
 
 const app = $('#app');
-const S = { c: param('c'), cfg: null, ban: 0, sid: '', topic: '', text: '', err: '', sent: false, sending: false, deferred: false };
+const S = { c: param('c'), cfg: null, grade: +param('g') || 0, ban: 0, sid: '', topic: '', text: '', err: '', sent: false, sending: false, deferred: false };
 
 function render() {
   S.deferred = false;
@@ -24,12 +24,15 @@ function view() {
 
   const all = studentList(S.cfg.students).filter(s => !s.hidden);
   if (!all.length) return h + `<div class="closed"><b>아직 학생 명단이 없어요.</b><p class="muted">선생님이 명단을 등록하면 이름을 고를 수 있습니다.</p></div></div>`;
-  const bans = [...new Set(all.map(s => s.ban))].sort((a, b) => a - b);
+  const grades = gradesOf(all);
+  if (!grades.includes(S.grade)) S.grade = grades[0];
+  const bans = bansOf(all, S.grade);
   if (!bans.includes(S.ban)) S.ban = bans[0];
-  const mine = sortStudents(all.filter(s => s.ban === S.ban), 'num');
+  const mine = sortStudents(all.filter(s => s.grade === S.grade && s.ban === S.ban), 'num');
   if (S.sid && !mine.some(s => s.id === S.sid)) S.sid = '';
   h += `<form class="ask-form" id="ask-form" novalidate>
     <div class="ask-who">
+      ${grades.length > 1 ? `<div class="field ban"><label for="ask-grade">학년</label><select id="ask-grade">${grades.map(g => `<option value="${g}" ${g === S.grade ? 'selected' : ''}>${g}학년</option>`).join('')}</select></div>` : ''}
       ${bans.length > 1 ? `<div class="field ban"><label for="ask-ban">반</label><select id="ask-ban">${bans.map(b => `<option value="${b}" ${b === S.ban ? 'selected' : ''}>${b}반</option>`).join('')}</select></div>` : ''}
       <div class="field grow"><label for="ask-student">이름</label><select id="ask-student"><option value="">이름을 고르세요</option>${mine.map(s => `<option value="${esc(s.id)}" ${s.id === S.sid ? 'selected' : ''}>${s.num}번 ${esc(s.name)}</option>`).join('')}</select></div>
     </div>
@@ -46,6 +49,7 @@ app.addEventListener('input', e => {
   if (e.target.id === 'ask-topic') S.topic = e.target.value;
 });
 app.addEventListener('change', e => {
+  if (e.target.id === 'ask-grade') { S.grade = +e.target.value; S.ban = 0; S.sid = ''; render(); }
   if (e.target.id === 'ask-ban') { S.ban = +e.target.value; S.sid = ''; render(); }
   if (e.target.id === 'ask-student') S.sid = e.target.value;
 });

@@ -1,27 +1,32 @@
 // 기록: 엑셀 내려받기와 구글 시트로 보내기. 표의 모양은 HEAD 한 곳에서 정한다.
 import { schoolYearOf, monthOf, mLabel, fmt } from './common.js';
 
-export const HEAD = ['학년도', '월', '반', '번호', '이름', '질문', '수업', '질문한 날', '승인한 날', '선생님 한마디', '빛나는 질문', '질문 번호'];
+export const HEAD = ['학년도', '월', '학년', '반', '번호', '이름', '질문', '수업', '질문한 날', '승인한 날', '선생님 한마디', '빛나는 질문', '질문 번호'];
 
 /** 열매 하나 → 표 한 줄. 이름은 지금 명단에서 가져오므로 이름을 고치면 다음 기록부터 따라간다. */
 export function toRow(id, f, student) {
   return [
     schoolYearOf(f.date), mLabel(monthOf(f.date)),
-    student ? student.ban : '', student ? student.num : '', student ? student.name : '(지운 학생)',
+    student ? student.grade ?? 1 : '', student ? student.ban : '', student ? student.num : '', student ? student.name : '(지운 학생)',
     f.text, f.topic || '', fmt(f.date), f.approved ? fmt(f.approved) : '',
     f.note || '', f.star ? '★' : '', id
   ];
 }
 
-/** 여러 달의 숲 → 표 줄들. month 를 주면 그 달만. 날짜, 반, 번호 순. */
-export function recordRows(forests, students, month = '') {
+/** 여러 달의 숲 → 표 줄들. month·grade 를 주면 그것만. 날짜, 학년, 반, 번호 순. */
+export function recordRows(forests, students, month = '', grade = 0) {
   const items = [];
   for (const [m, fruits] of Object.entries(forests || {})) {
     if (month && m !== month) continue;
-    for (const [id, f] of Object.entries(fruits)) items.push({ id, f, s: students[f.sid] });
+    for (const [id, f] of Object.entries(fruits)) {
+      const s = students[f.sid];
+      // 지운 학생은 학년을 알 수 없으니 '모든 학년'에서만 보인다
+      if (grade && (!s || (s.grade ?? 1) !== grade)) continue;
+      items.push({ id, f, s });
+    }
   }
   items.sort((a, b) => a.f.date.localeCompare(b.f.date)
-    || (a.s?.ban ?? 99) - (b.s?.ban ?? 99) || (a.s?.num ?? 99) - (b.s?.num ?? 99) || a.id.localeCompare(b.id));
+    || (a.s?.grade ?? 99) - (b.s?.grade ?? 99) || (a.s?.ban ?? 99) - (b.s?.ban ?? 99) || (a.s?.num ?? 99) - (b.s?.num ?? 99) || a.id.localeCompare(b.id));
   return items.map(x => toRow(x.id, x.f, x.s));
 }
 
@@ -48,9 +53,15 @@ export const sheetNameOf = date => `${schoolYearOf(date)}학년도`;
 export const upsertOp = (id, f, student) => ({ type: 'upsert', id, sheet: sheetNameOf(f.date), row: toRow(id, f, student) });
 export const removeOp = (id, date) => ({ type: 'remove', id, sheet: sheetNameOf(date) });
 
+/**
+ * 시트 코드의 판. HEAD 처럼 칸 모양이 바뀌면 올린다. 저장된 판이 이와 다르면 교사 화면이
+ * 보내기를 멈추고 코드를 다시 붙여 넣으라고 한다 — 예전 코드는 칸 수가 달라 줄이 어긋나게 적힌다.
+ */
+export const SCRIPT_VERSION = 2;
+
 /** 시트에 붙여 넣을 Apps Script. 토큰이 들어가 있어서 이 코드를 가진 시트만 기록을 받는다. */
 export function appsScript(token) {
-  return APPS_SCRIPT.replace('__TOKEN__', token).replace('__HEAD__', JSON.stringify(HEAD));
+  return APPS_SCRIPT.replace('__TOKEN__', token).replace('__HEAD__', JSON.stringify(HEAD)).replace('__VERSION__', SCRIPT_VERSION);
 }
 const APPS_SCRIPT = `// 질문나무 → 구글 시트 기록 (질문나무 교사 화면에서 복사한 코드)
 // 이 코드는 고치지 말고 그대로 저장한 뒤 '웹 앱'으로 배포하세요.
@@ -64,7 +75,7 @@ function doPost(e) {
     lock.waitLock(20000);
     const body = JSON.parse(e.postData.contents);
     if (body.token !== TOKEN) return reply({ ok: false, error: 'token' });
-    if (body.action === 'ping') return reply({ ok: true });
+    if (body.action === 'ping') return reply({ ok: true, version: __VERSION__ });
     if (body.action === 'replaceAll') {
       const sh = sheet_(body.sheet);
       sh.clearContents();
@@ -143,7 +154,7 @@ export async function downloadXlsx(rows, filename) {
   await loadScript(SHEETJS);
   const XLSX = window.XLSX;
   const ws = XLSX.utils.aoa_to_sheet([HEAD, ...rows]);
-  ws['!cols'] = [6, 5, 4, 5, 8, 50, 16, 12, 12, 30, 9, 22].map(wch => ({ wch }));
+  ws['!cols'] = [6, 5, 4, 4, 5, 8, 50, 16, 12, 12, 30, 9, 22].map(wch => ({ wch }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '질문 기록');
   XLSX.writeFile(wb, filename);

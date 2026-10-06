@@ -124,9 +124,9 @@ export const deleteQuestion = (c, id) => deleteDoc(P.question(c, id));
 export const updateSettings = (c, patch) =>
   updateDoc(P.config(c), Object.fromEntries(Object.entries(patch).map(([k, v]) => ['settings.' + k, v])));
 
-/** 학생 여럿을 명단에 넣는다. list = [{id, ban, num, name}] */
+/** 학생 여럿을 명단에 넣는다. list = [{id, grade, ban, num, name}] */
 export const addStudents = (c, list) =>
-  updateDoc(P.config(c), Object.fromEntries(list.map(s => ['students.' + s.id, { ban: s.ban, num: s.num, name: s.name, hidden: false }])));
+  updateDoc(P.config(c), Object.fromEntries(list.map(s => ['students.' + s.id, { grade: s.grade, ban: s.ban, num: s.num, name: s.name, hidden: false }])));
 
 export const updateStudent = (c, sid, field, value) => updateDoc(P.config(c), new FieldPath('students', sid, field), value);
 
@@ -161,7 +161,7 @@ export async function getSheet(c) {
   const s = await getDoc(P.sheet(c));
   return s.exists() ? s.data() : null;
 }
-export const saveSheet = (c, { url, token }) => setDoc(P.sheet(c), { url, token, at: serverTimestamp() });
+export const saveSheet = (c, { url, token, version }) => setDoc(P.sheet(c), { url, token, version, at: serverTimestamp() });
 export const clearSheet = c => deleteDoc(P.sheet(c));
 
 /** 시트로 아직 못 보낸 질문들. */

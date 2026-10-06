@@ -1,6 +1,6 @@
 // 질문나무 화면 (tree.html?c=반코드). 이번 달 숲, 지난 달 숲, 한 해 돌아보기.
 import { $, esc, fmt, today, monthOf, mLabel, monthsSoFar, schoolYearOf, schoolMonths, param, maskName,
-  studentList, sortStudents, withDefaults, fruitsOf, fruitsAcross, fatal, errorText } from './common.js';
+  studentList, sortStudents, gradesOf, bansOf, withDefaults, fruitsOf, fruitsAcross, fatal, errorText } from './common.js';
 import { treeSVG, stageLabel, SEASONS, FRUITS } from './tree-draw.js';
 import * as store from './store.js';
 
@@ -10,7 +10,7 @@ const S = {
   c: param('c'), cfg: null,
   months: monthsSoFar(NOW), month: CUR,
   mode: location.hash === '#year' ? 'year' : 'month',
-  ban: 'all', focus: null,
+  grade: +param('g') || 'all', ban: 'all', focus: null,
   forests: {},          // { '2026-10': fruits } 불러온 달만
   fresh: new Set(), seenLive: null
 };
@@ -48,22 +48,27 @@ function head(total, stars) {
 
 function forestView() {
   const s = st(), all = students();
-  const bans = [...new Set(all.map(x => x.ban))].sort((a, b) => a - b);
+  const grades = gradesOf(all);
+  if (S.grade !== 'all' && !grades.includes(S.grade)) S.grade = 'all';
+  if (grades.length === 1) S.grade = grades[0];
+  // 반 탭은 학년을 하나 골랐을 때만. 전체 학년에서 '2반'은 여러 학년의 2반이 섞여 뜻이 없다.
+  const bans = S.grade === 'all' ? [] : bansOf(all, S.grade);
   if (S.ban !== 'all' && !bans.includes(S.ban)) S.ban = 'all';
-  const pool = all.filter(x => S.ban === 'all' || x.ban === S.ban);
+  const pool = all.filter(x => (S.grade === 'all' || x.grade === S.grade) && (S.ban === 'all' || x.ban === S.ban));
   const loaded = yearView() ? S.months.every(m => m in S.forests) : S.month in S.forests;
   const counts = new Map(pool.map(x => [x.id, viewFruits(x.id)]));
   const total = [...counts.values()].reduce((n, l) => n + l.length, 0);
   const stars = [...counts.values()].reduce((n, l) => n + l.filter(f => f.star).length, 0);
   let h = head(total, stars);
-  if (bans.length > 1) h += `<div class="ban-tabs">${['all', ...bans].map(b => `<button type="button" class="ban-tab" aria-pressed="${S.ban === b}" data-act="ban" data-id="${b}">${b === 'all' ? '전체' : b + '반'}</button>`).join('')}</div>`;
+  if (grades.length > 1) h += `<div class="ban-tabs" role="group" aria-label="학년">${['all', ...grades].map(g => `<button type="button" class="ban-tab" aria-pressed="${S.grade === g}" data-act="grade" data-id="${g}">${g === 'all' ? '전체 학년' : g + '학년'}</button>`).join('')}</div>`;
+  if (bans.length > 1) h += `<div class="ban-tabs" role="group" aria-label="반">${['all', ...bans].map(b => `<button type="button" class="ban-tab" aria-pressed="${S.ban === b}" data-act="ban" data-id="${b}">${b === 'all' ? '전체' : b + '반'}</button>`).join('')}</div>`;
   if (!pool.length) return h + '<div class="empty"><b>아직 나무가 없습니다</b><p class="muted">선생님이 학생 명단을 등록하면 나무가 생깁니다.</p></div>';
   if (!loaded) return h + '<p class="loading">숲을 불러오는 중…</p>';
   if (yearView()) h += yearChart(pool);
   h += `<div class="forest" style="--per:${s.perRow}">` + sortStudents(pool, s.sort, id => counts.get(id).length).map(x => {
     const fr = counts.get(x.id), ns = fr.filter(f => f.star).length;
     const cnt = (fr.length ? `열매 ${fr.length}` : '새싹') + (ns ? ` · <span class="g">빛나는 ${ns}</span>` : '');
-    return `<button type="button" class="tree-card" data-act="focus" data-id="${esc(x.id)}" aria-label="${esc(shown(x))}의 나무, 열매 ${fr.length}개">${treeSVG(seedOf(x.id), fr, { season: s.season, fruit: s.fruit, year: yearView(), fresh: S.fresh })}<span class="tc-name">${esc(shown(x))}</span><span class="tc-count">${bans.length > 1 && S.ban === 'all' ? x.ban + '반 · ' : ''}${cnt}</span></button>`;
+    return `<button type="button" class="tree-card" data-act="focus" data-id="${esc(x.id)}" aria-label="${esc(shown(x))}의 나무, 열매 ${fr.length}개">${treeSVG(seedOf(x.id), fr, { season: s.season, fruit: s.fruit, year: yearView(), fresh: S.fresh })}<span class="tc-name">${esc(shown(x))}</span><span class="tc-count">${S.grade === 'all' && grades.length > 1 ? `${x.grade}학년 ${x.ban}반 · ` : bans.length > 1 && S.ban === 'all' ? x.ban + '반 · ' : ''}${cnt}</span></button>`;
   }).join('') + '</div>';
   return h;
 }
@@ -113,7 +118,7 @@ function focusView(x) {
   }
   return `<button type="button" class="ghost back" id="back-btn" data-act="unfocus">← ${year ? '돌아보기' : mLabel(S.month) + '의 숲'}으로</button>
     <div class="focus"><div class="focus-tree">${treeSVG(seedOf(x.id), fr, { season: s.season, fruit: s.fruit, interactive: true, year, fresh: S.fresh })}</div>
-    <div class="focus-info"><div class="kicker">${x.ban}반 ${x.num}번 · ${year ? schoolYearOf(NOW) + '학년도' : mLabel(S.month)}</div>
+    <div class="focus-info"><div class="kicker">${x.grade}학년 ${x.ban}반 ${x.num}번 · ${year ? schoolYearOf(NOW) + '학년도' : mLabel(S.month)}</div>
     <h1 class="focus-name">${esc(shown(x))}의 ${year ? '한 해' : '나무'}</h1>
     <p class="stage">${stageLabel(fr.length, year)} · 열매 ${fr.length}개${ns ? ` · 빛나는 질문 ${ns}개` : ''}</p>${info}</div></div>`;
 }
@@ -194,6 +199,7 @@ app.addEventListener('click', e => {
     if (id === 'year') ensureMonths(S.months);
   }
   if (act === 'month' && id) { S.month = id; ensureMonths([id]); }
+  if (act === 'grade') { S.grade = id === 'all' ? 'all' : +id; S.ban = 'all'; }
   if (act === 'ban') S.ban = id === 'all' ? 'all' : +id;
   if (act === 'open-q') return openNote(id);
   if (act === 'focus') { S.focus = id; render(); $('#back-btn')?.focus({ preventScroll: true }); scrollTo({ top: 0 }); return; }

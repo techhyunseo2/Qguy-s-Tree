@@ -49,7 +49,15 @@ async function js(expr) {
   return r.result.value;
 }
 // 매번 빈 페이지를 거친다. 주소의 # 뒤만 다르면 브라우저가 다시 불러오지 않아 앞 시험의 화면이 남는다.
-async function open(path) { await cdp('Page.navigate', { url: 'about:blank' }); await sleep(100); await cdp('Page.navigate', { url: BASE + path }); await sleep(900); }
+async function open(path) { await cdp('Page.navigate', { url: 'about:blank' }); await sleep(100); await cdp('Page.navigate', { url: BASE + path });
+  // 정해진 시간 대신 '불러오는 중' 이 사라질 때까지 기다린다. Chrome 을 막 켠 첫 페이지는 1초를 넘기기도 한다.
+  for (let i = 0; i < 50; i++) {
+    await sleep(100);
+    const r = await cdp('Runtime.evaluate', { expression: "document.readyState === 'complete' && !!document.querySelector('#app') && !document.querySelector('#app .loading')", returnByValue: true }).catch(() => null);
+    if (r?.result?.value) break;
+  }
+  await sleep(150);
+}
 async function shot(name) { const r = await cdp('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(shots, name + '.png'), Buffer.from(r.data, 'base64')); }
 const H = `const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)], wait = ms => new Promise(r => setTimeout(r, ms));
   const click = el => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
@@ -98,6 +106,36 @@ try {
   });
   await shot('tree-year');
 
+  await check('질문나무: 학년 탭을 고르면 그 학년만, 반 탭은 학년을 고른 뒤에 나온다', async () => {
+    await open('tree.html?c=x');
+    const r = await js(`${H}
+      const groups = () => $$('.ban-tabs').map(g => g.getAttribute('aria-label'));
+      const before = { groups: groups(), cards: $$('.tree-card').length, label: $$('.tc-count')[0].textContent };
+      click($$('[data-act="grade"]').find(b => b.textContent === '2학년')); await wait(100);
+      return { before, groups: groups(), names: $$('.tc-name').map(n => n.textContent) };`);
+    expect(r.before.groups.join() === '학년', '전체 학년에서 반 탭이 보임 ' + r.before.groups);
+    expect(r.before.label.includes('1학년 '), '전체 학년 카드에 학년이 안 붙음: ' + r.before.label);
+    expect(r.groups.join() === '학년,반', '2학년을 골랐는데 반 탭이 없음');
+    expect(r.names.join() === '서다온,문예준', '2학년만 나오지 않음: ' + r.names);
+  });
+
+  await check('질문나무: 학년 링크(&g=2)로 열면 2학년이 골라져 있다', async () => {
+    await open('tree.html?c=x&g=2');
+    const r = await js(`${H} return $$('.tc-name').map(n => n.textContent);`);
+    expect(r.join() === '서다온,문예준', '&g=2 가 듣지 않음: ' + r);
+  });
+
+  await check('질문 등록: 학년을 바꾸면 그 학년의 반·이름만', async () => {
+    await open('ask.html?c=x&g=2');
+    const r = await js(`${H}
+      const opts = () => [...$('#ask-student').options].slice(1).map(o => o.textContent);
+      const g = $('#ask-grade').value, first = opts();
+      const b = $('#ask-ban'); b.value = '3'; b.dispatchEvent(new Event('change', { bubbles: true }));
+      return { g, first, second: opts() };`);
+    expect(r.g === '2', '학년 링크가 듣지 않음');
+    expect(r.first.join() === '1번 서다온' && r.second.join() === '4번 문예준', JSON.stringify(r));
+  });
+
   await check('질문 등록: 이름 없이 보내면 막고, 고르고 쓰면 보낸다', async () => {
     await open('ask.html?c=x');
     const r = await js(`${H}
@@ -124,10 +162,13 @@ try {
       const inList = document.body.textContent.includes('(고침)') && document.body.textContent.includes('한마디 · 좋은 질문!');
       click($('#tab-record')); await wait(100);
       const rows = $$('.rec tbody tr').length;
-      return { n0, n1, inList, rows };`);
+      const g = $('#rec-grade'); g.value = '2'; g.dispatchEvent(new Event('change', { bubbles: true })); await wait(100);
+      const rows2 = $$('.rec tbody tr').length;
+      return { n0, n1, inList, rows, rows2 };`);
     expect(r.n1 === r.n0 - 1, `대기 ${r.n0} → ${r.n1}`);
     expect(r.inList, '고친 글이나 한마디가 열린 열매에 없음');
-    expect(r.rows === 10, `기록 줄 ${r.rows} (10이어야 함)`);
+    expect(r.rows === 11, `기록 줄 ${r.rows} (11이어야 함)`);
+    expect(r.rows2 === 1, `2학년만 거른 기록 줄 ${r.rows2} (1이어야 함)`);
   });
   await shot('admin-record');
 
@@ -148,11 +189,13 @@ try {
     await open('admin.html?k=x#settings');
     const r = await js(`${H}
       const n0 = $$('.roster tbody tr').length;
-      type($('#paste-box'), '1\\t1\\t강지우\\n3\\t1\\t새학생\\n이름만');
+      type($('#paste-box'), '1\\t1\\t강지우\\n3\\t1\\t새학생\\n이름만\\n3\\t2\\t1\\t삼학년');
       click($('[data-act="paste"]')); await wait(400);
       const names = $$('.roster tbody input[id^="stu-name-"]').map(i => i.value);
-      return { n0, n1: names.length, names, box: $('#paste-box').value };`);
-    expect(r.n1 === r.n0 + 2, `명단 ${r.n0} → ${r.n1}`);
+      const g3 = $$('.roster tbody tr').find(tr => tr.querySelector('[id^="stu-name-"]').value === '삼학년')?.querySelector('[id^="stu-grade-"]').value;
+      return { n0, n1: names.length, names, g3, box: $('#paste-box').value };`);
+    expect(r.n1 === r.n0 + 3, `명단 ${r.n0} → ${r.n1}`);
+    expect(r.g3 === '3', '네 칸 붙여넣기의 학년이 들어가지 않음: ' + r.g3);
     expect(r.names.includes('새학생') && r.names.includes('이름만'), '새 학생이 안 들어감');
     expect(r.box === '', '붙여넣기 칸이 비워지지 않음');
   });

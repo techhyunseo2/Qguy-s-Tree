@@ -15,7 +15,9 @@ const db = {
       s01: { ban: 1, num: 1, name: '강지우', hidden: false }, s02: { ban: 1, num: 2, name: '김하늘', hidden: false },
       s03: { ban: 1, num: 3, name: '박서준', hidden: false }, s04: { ban: 1, num: 4, name: '윤채원', hidden: false },
       s05: { ban: 1, num: 5, name: '이도윤', hidden: false }, s06: { ban: 2, num: 1, name: '최유나', hidden: false },
-      s07: { ban: 2, num: 2, name: '한지호', hidden: false }, s08: { ban: 2, num: 3, name: '오세린', hidden: true }
+      s07: { ban: 2, num: 2, name: '한지호', hidden: false }, s08: { ban: 2, num: 3, name: '오세린', hidden: true },
+      // 학년 칸이 없는 위 학생들은 1학년으로 읽힌다(학년을 넣기 전 명단). 아래는 2학년.
+      t01: { grade: 2, ban: 1, num: 1, name: '서다온', hidden: false }, t02: { grade: 2, ban: 3, num: 4, name: '문예준', hidden: false }
     }
   },
   forests: {},
@@ -35,6 +37,7 @@ add('a6', 's01', day(back(1), 9), '역사 속 인물이 지금 태어났다면 �
 add('a7', 's02', day(back(1), 16), '꿀벌이 사라지면 우리 식탁은 어떻게 달라지나요?', '과학');
 add('a8', 's06', day(back(2), 20), '무지개는 왜 늘 둥근 모양인가요?', '과학 · 빛');
 add('a9', 's04', day(back(3), 12), '별은 반짝이는데 행성은 왜 덜 반짝이나요?', '과학 · 별');
+add('b1', 't01', day(back(0), 3), '빛은 무게가 있나요?', '과학 · 빛');
 db.questions.p1 = { sid: 's03', text: '빛보다 빠른 것은 정말 하나도 없나요?', topic: '과학 · 빛', date: NOW, status: 'pending' };
 db.questions.p2 = { sid: 's05', text: '오늘 급식 뭐예요?', topic: '', date: NOW, status: 'pending' };
 db.questions.h1 = { sid: 's07', text: 'ㅋㅋㅋ', topic: '', date: NOW, status: 'held' };
@@ -72,7 +75,7 @@ export async function hold(c, id) { db.questions[id].status = 'held'; emit(); }
 export async function reopen(c, id) { db.questions[id].status = 'pending'; emit(); }
 export async function deleteQuestion(c, id) { delete db.questions[id]; emit(); }
 export async function updateSettings(c, p) { Object.assign(db.config.settings, p); emit(); }
-export async function addStudents(c, list) { list.forEach(s => { db.config.students[s.id] = { ban: s.ban, num: s.num, name: s.name, hidden: false }; }); emit(); }
+export async function addStudents(c, list) { list.forEach(s => { db.config.students[s.id] = { grade: s.grade, ban: s.ban, num: s.num, name: s.name, hidden: false }; }); emit(); }
 export async function updateStudent(c, sid, field, v) { db.config.students[sid][field] = v; emit(); }
 export async function deleteStudent(c, sid) {
   const gone = Object.entries(db.questions).filter(([, q]) => q.sid === sid).map(([id, q]) => ({ id, date: q.date }));

@@ -39,20 +39,28 @@ export function monthsSoFar(now = today()) {
 
 /* ── 학생 ── */
 export const maskName = n => n.length <= 1 ? n : n.length === 2 ? n[0] + '*' : n[0] + '*'.repeat(n.length - 2) + n[n.length - 1];
-export const real = s => s ? `${s.ban}반 ${s.num}번 ${s.name}` : '(지운 학생)';
+export const real = s => s ? `${s.grade}학년 ${s.ban}반 ${s.num}번 ${s.name}` : '(지운 학생)';
 
-/** 설정 문서의 students 지도 → 배열. 빠진 칸은 기본값으로 채운다. */
-export const studentList = map => Object.entries(map || {}).map(([id, s]) => ({ id, ban: 1, num: 0, name: '', hidden: false, ...s }));
+/** 설정 문서의 students 지도 → 배열. 빠진 칸은 기본값으로 채운다(학년을 넣기 전에 만든 명단은 1학년). */
+export const studentList = map => Object.entries(map || {}).map(([id, s]) => ({ id, grade: 1, ban: 1, num: 0, name: '', hidden: false, ...s }));
 
+/** 학년·반 목록. 반은 학년을 주면 그 학년 안에서만. */
+export const gradesOf = list => [...new Set(list.map(s => s.grade))].sort((a, b) => a - b);
+export const bansOf = (list, grade) => [...new Set(list.filter(s => grade === 'all' || s.grade === grade).map(s => s.ban))].sort((a, b) => a - b);
+
+const byClass = (a, b) => a.grade - b.grade || a.ban - b.ban || a.num - b.num;
 export function sortStudents(list, how, count = () => 0) {
   const l = list.slice();
   if (how === 'name') l.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  else if (how === 'fruits') l.sort((a, b) => count(b.id) - count(a.id) || a.ban - b.ban || a.num - b.num);
-  else l.sort((a, b) => a.ban - b.ban || a.num - b.num);
+  else if (how === 'fruits') l.sort((a, b) => count(b.id) - count(a.id) || byClass(a, b));
+  else l.sort(byClass);
   return l;
 }
 
-/** 붙여 넣은 명단 글 → [{ban, num, name}]. 한 줄에 한 명, 칸은 탭·쉼표·빈칸으로 나뉜다. */
+/**
+ * 붙여 넣은 명단 글 → [{grade, ban, num, name}]. 한 줄에 한 명, 칸은 탭·쉼표·빈칸으로 나뉜다.
+ * 숫자 칸이 셋이면 학년·반·번호, 둘이면 반·번호, 하나면 번호. 없는 칸은 0(부르는 쪽이 기본값을 정한다).
+ */
 export function parseRoster(text) {
   const out = [];
   for (const line of String(text).split(/\r?\n/)) {
@@ -60,12 +68,13 @@ export function parseRoster(text) {
     if (!l) continue;
     let p = l.split(/[\t,]+/).map(x => x.trim()).filter(Boolean);
     if (p.length === 1) p = l.split(/\s+/);
-    let ban = 0, num = 0, name = '';
-    if (p.length >= 3 && /^\d+$/.test(p[0]) && /^\d+$/.test(p[1])) { ban = +p[0]; num = +p[1]; name = p.slice(2).join(' '); }
-    else if (p.length >= 2 && /^\d+$/.test(p[0])) { num = +p[0]; name = p.slice(1).join(' '); }
-    else name = p.join(' ');
+    let k = 0;
+    while (k < 3 && k < p.length - 1 && /^\d+$/.test(p[k])) k++;
+    const n = p.slice(0, k).map(Number);
+    const [grade, ban, num] = k === 3 ? n : k === 2 ? [0, ...n] : k === 1 ? [0, 0, n[0]] : [0, 0, 0];
+    let name = p.slice(k).join(' ');
     name = name.replace(/\s+/g, ' ').slice(0, 10);
-    if (name) out.push({ ban, num, name });
+    if (name) out.push({ grade, ban, num, name });
   }
   return out;
 }
