@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { schoolYearOf, schoolMonths, monthsSoFar, maskName, parseRoster, sortStudents, fruitsOf, fruitsAcross, randKey, withDefaults, fmt, mLabel, studentList, gradesOf, bansOf, real } from '../js/common.js';
+import { schoolYearOf, schoolMonths, monthsSoFar, maskName, parseRoster, sortStudents, fruitsOf, fruitsAcross, randKey, withDefaults, fmt, mLabel, studentList, gradesOf, bansOf, real, GRADES, isGrade } from '../js/common.js';
 
 test('학년도는 3월에 시작해 이듬해 2월에 끝난다', () => {
   assert.equal(schoolYearOf('2026-03-01'), 2026);
@@ -93,4 +93,10 @@ test('저장된 설정이 일부만 있어도 기본값으로 채운다', () => 
   assert.equal(s.season, 'winter');
   assert.equal(s.open, true);
   assert.equal(s.review, false);
+});
+
+test('중학교라 1~3학년만', () => {
+  assert.deepEqual(GRADES, [1, 2, 3]);
+  assert.ok(isGrade(1) && isGrade(3));
+  assert.ok(!isGrade(0) && !isGrade(4) && !isGrade('2'));
 });

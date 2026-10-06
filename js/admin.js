@@ -1,5 +1,5 @@
 // 교사 화면 (admin.html?k=교사키): 검토 · 열린 열매 · 보류 · 기록 · 설정
-import { $, esc, fmt, today, monthOf, mLabel, monthsSoFar, schoolYearOf, param, real, studentList, sortStudents, gradesOf,
+import { $, esc, fmt, today, monthOf, mLabel, monthsSoFar, schoolYearOf, param, real, studentList, sortStudents, gradesOf, GRADES, isGrade,
   parseRoster, withDefaults, DEFAULT_TITLE, toast, fatal, errorText, copyText, randKey, typingIn, keepFocus } from './common.js';
 import { treeSVG, SEASONS, FRUITS } from './tree-draw.js';
 import * as store from './store.js';
@@ -35,7 +35,7 @@ const links = () => {
   return l;
 };
 /** 학년이 없는 붙여넣기 줄의 학년: 고른 값, 없으면 명단의 첫 학년, 그것도 없으면 1학년. */
-const pasteGrade = () => S.pasteGrade || grades()[0] || 1;
+const pasteGrade = () => S.pasteGrade || grades().find(isGrade) || 1;
 const empty = (t, d) => `<div class="empty"><b>${t}</b><p class="muted">${d}</p></div>`;
 const busy = id => S.busy.has(id) ? 'disabled' : '';
 const studentOptions = (sel = '') => sortStudents(studentList(studentsMap()).filter(s => !s.hidden), 'num')
@@ -148,7 +148,7 @@ function settingsView() {
   allFruits().forEach(f => counts.set(f.sid, (counts.get(f.sid) || 0) + 1));
   const rows = sortStudents(studentList(studentsMap()), 'num').map(x => {
     const n = counts.get(x.id) || 0, c = S.confirm === 'dels:' + x.id;
-    return `<tr class="${x.hidden ? 'is-hidden' : ''}"><td><input class="num-in" type="number" id="stu-grade-${x.id}" min="1" max="6" value="${x.grade}" aria-label="${esc(x.name)} 학년"></td><td><input class="num-in" type="number" id="stu-ban-${x.id}" min="1" max="30" value="${x.ban}" aria-label="${esc(x.name)} 반"></td><td><input class="num-in" type="number" id="stu-num-${x.id}" min="1" max="99" value="${x.num}" aria-label="${esc(x.name)} 번호"></td><td><input id="stu-name-${x.id}" maxlength="10" value="${esc(x.name)}" aria-label="이름" autocomplete="off"></td><td class="c">${n}</td><td class="c"><input type="checkbox" id="stu-hide-${x.id}" ${x.hidden ? 'checked' : ''} aria-label="${esc(x.name)} 숨기기"></td><td><button type="button" class="link-btn${c ? ' danger' : ''}" data-act="dels" data-id="${x.id}" ${busy(x.id)}>${c ? (n ? `열매 ${n}개도 지워집니다. 지우기` : '정말 지우기') : '지우기'}</button></td></tr>`;
+    return `<tr class="${x.hidden ? 'is-hidden' : ''}"><td><input class="num-in" type="number" id="stu-grade-${x.id}" min="1" max="${GRADES.length}" value="${x.grade}" aria-label="${esc(x.name)} 학년"></td><td><input class="num-in" type="number" id="stu-ban-${x.id}" min="1" max="30" value="${x.ban}" aria-label="${esc(x.name)} 반"></td><td><input class="num-in" type="number" id="stu-num-${x.id}" min="1" max="99" value="${x.num}" aria-label="${esc(x.name)} 번호"></td><td><input id="stu-name-${x.id}" maxlength="10" value="${esc(x.name)}" aria-label="이름" autocomplete="off"></td><td class="c">${n}</td><td class="c"><input type="checkbox" id="stu-hide-${x.id}" ${x.hidden ? 'checked' : ''} aria-label="${esc(x.name)} 숨기기"></td><td><button type="button" class="link-btn${c ? ' danger' : ''}" data-act="dels" data-id="${x.id}" ${busy(x.id)}>${c ? (n ? `열매 ${n}개도 지워집니다. 지우기` : '정말 지우기') : '지우기'}</button></td></tr>`;
   }).join('');
   const radio = (name, map) => Object.entries(map).map(([k, v]) => `<label class="chip-radio"><input type="radio" name="${name}" id="${name}-${k}" value="${k}" ${s[name] === k ? 'checked' : ''}><span>${v.name}</span></label>`).join('');
   const linkRow = (k, label, url, cls = '') => `<div class="link-row ${cls}"><span>${label}</span><code>${esc(url)}</code><button type="button" class="ghost sm" data-act="copy" data-id="${k}">복사</button></div>`;
@@ -157,7 +157,7 @@ function settingsView() {
   <section class="set-sec"><h2>학생 명단</h2>
     <p class="muted">이름을 고치면 그 학생의 나무와 열매, 기록이 그대로 따라갑니다. 숨기기는 전학 간 학생처럼 화면에서만 빼 둘 때 씁니다. 열매 수는 ${SY}학년도 전체입니다.</p>
     ${rows ? `<div class="tbl-wrap"><table class="roster"><thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th><th class="c">열매</th><th class="c">숨김</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">아직 학생이 없습니다. 아래에 붙여 넣어 등록하세요.</p>'}
-    <div class="paste"><div class="field"><label for="paste-box">한꺼번에 추가 <span class="lbl-note">엑셀이나 나이스에서 학년·반·번호·이름 네 칸(또는 반·번호·이름 세 칸)을 복사해 붙여 넣으세요. 이름만 넣어도 됩니다.</span></label><textarea id="paste-box" rows="4" placeholder="1&#9;7&#9;홍길동&#10;2&#9;5&#9;김예시">${esc(S.paste)}</textarea></div><div class="field" style="flex:0 0 130px"><label for="paste-grade">학년이 없는 줄</label><select id="paste-grade">${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${n === pasteGrade() ? 'selected' : ''}>${n}학년</option>`).join('')}</select></div><button type="button" class="primary" data-act="paste" ${busy('paste')}>명단에 추가</button></div>
+    <div class="paste"><div class="field"><label for="paste-box">한꺼번에 추가 <span class="lbl-note">엑셀이나 나이스에서 학년·반·번호·이름 네 칸(또는 반·번호·이름 세 칸)을 복사해 붙여 넣으세요. 이름만 넣어도 됩니다.</span></label><textarea id="paste-box" rows="4" placeholder="1&#9;7&#9;홍길동&#10;2&#9;5&#9;김예시">${esc(S.paste)}</textarea></div><div class="field" style="flex:0 0 130px"><label for="paste-grade">학년이 없는 줄</label><select id="paste-grade">${GRADES.map(n => `<option value="${n}" ${n === pasteGrade() ? 'selected' : ''}>${n}학년</option>`).join('')}</select></div><button type="button" class="primary" data-act="paste" ${busy('paste')}>명단에 추가</button></div>
   </section>
   <section class="set-sec"><h2>화면 조절</h2>
     <div class="set-grid"><div class="set-controls">
@@ -283,19 +283,24 @@ const actions = {
     const got = parseRoster(S.paste);
     if (!got.length) return toast('넣을 이름을 찾지 못했습니다. 한 줄에 한 명씩 붙여 넣어 주세요');
     const have = studentList(studentsMap());
-    const add = [];
+    const add = [], out = [];
     for (const g of got) {
       const grade = g.grade || pasteGrade(), ban = g.ban || 1;
+      if (!isGrade(grade)) { out.push(g); continue; }
       const same = x => x.grade === grade && x.ban === ban;
       if ([...have, ...add].some(x => same(x) && x.name === g.name && (!g.num || x.num === g.num))) continue;
       const num = g.num || Math.max(0, ...[...have, ...add].filter(same).map(x => x.num)) + 1;
       add.push({ id: 's' + randKey(10), grade, ban, num, name: g.name });
     }
-    if (!add.length) return toast('붙여 넣은 학생이 모두 이미 명단에 있습니다');
+    // 1~3학년이 아닌 줄은 넣지 않고 칸에 남겨 둔다. 고쳐서 다시 누를 수 있게.
+    const outText = out.map(g => [g.grade, g.ban, g.num, g.name].join('\t')).join('\n');
+    const outMsg = out.length ? ` ${out.length}명은 학년이 1~${GRADES.length}학년이 아니라 넣지 않았습니다(칸에 남겨 둠).` : '';
+    if (!add.length) { S.paste = outText || S.paste; return toast(out.length ? outMsg.trim() : '붙여 넣은 학생이 모두 이미 명단에 있습니다'); }
+    const skipped = got.length - add.length - out.length;
     run('paste', async () => {
       await store.addStudents(S.c, add);
-      S.paste = '';
-      toast(`${add.length}명을 명단에 넣었습니다${got.length > add.length ? ` (이미 있는 ${got.length - add.length}명은 건너뜀)` : ''}`);
+      S.paste = outText;
+      toast(`${add.length}명을 명단에 넣었습니다${skipped ? ` (이미 있는 ${skipped}명은 건너뜀)` : ''}.${outMsg}`);
     });
   },
   dels(id) {
@@ -390,7 +395,10 @@ app.addEventListener('change', e => {
     let v;
     if (field === 'hide') v = t.checked;
     else if (field === 'name') { v = t.value.trim().slice(0, 10); if (!v) { t.value = cur.name; return; } }
-    else { v = parseInt(t.value, 10); if (!(v >= 1)) { t.value = cur[field]; return; } }
+    else {
+      v = parseInt(t.value, 10);
+      if (!(v >= 1) || (field === 'grade' && !isGrade(v))) { t.value = cur[field]; if (field === 'grade') toast(`학년은 1~${GRADES.length} 사이로 적어 주세요`); return; }
+    }
     store.updateStudent(S.c, sid, field === 'hide' ? 'hidden' : field, v).catch(err => toast(errorText(err)));
     return;
   } else return;

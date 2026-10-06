@@ -200,6 +200,23 @@ try {
     expect(r.box === '', '붙여넣기 칸이 비워지지 않음');
   });
 
+  await check('교사: 1~3학년만 받는다 — 4학년 줄은 넣지 않고 칸에 남기고, 학년 칸에 5를 적으면 되돌린다', async () => {
+    await open('admin.html?k=x#settings');
+    const r = await js(`${H}
+      const n0 = $$('.roster tbody tr').length;
+      type($('#paste-box'), '3\\t1\\t1\\t삼학년\\n4\\t1\\t1\\t사학년');
+      click($('[data-act="paste"]')); await wait(400);
+      const names = $$('.roster tbody input[id^="stu-name-"]').map(i => i.value);
+      const left = $('#paste-box').value;
+      const opts = [...$('#paste-grade').options].map(o => o.value).join();
+      const gi = $('[id^="stu-grade-"]'); const id = gi.id; gi.value = '5'; gi.dispatchEvent(new Event('change', { bubbles: true })); await wait(300);
+      return { n0, n1: names.length, has3: names.includes('삼학년'), has4: names.includes('사학년'), left, opts, after: document.getElementById(id).value };`);
+    expect(r.n1 === r.n0 + 1 && r.has3 && !r.has4, '학년 거르기 실패 ' + JSON.stringify(r));
+    expect(r.left.includes('사학년') && !r.left.includes('삼학년'), '넣지 않은 줄이 칸에 남지 않음: ' + JSON.stringify(r.left));
+    expect(r.opts === '1,2,3', '학년 고르기 목록 ' + r.opts);
+    expect(r.after === '1', '학년 5가 되돌려지지 않음: ' + r.after);
+  });
+
   await check('교사: 계절을 바꾸면 미리보기 나무가 바뀐다', async () => {
     await open('admin.html?k=x#settings');
     const r = await js(`${H}
