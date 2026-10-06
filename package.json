@@ -1,0 +1,9 @@
+{
+  "name": "question-tree",
+  "private": true,
+  "type": "module",
+  "description": "Q가이즈의 질문나무. 빌드 도구 없이 쓰는 정적 웹 페이지이고, 이 파일은 시험(node --test)을 돌리기 위해서만 있다.",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}

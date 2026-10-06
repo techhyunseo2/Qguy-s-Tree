@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>질문나무</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='19' r='11' fill='%23d8443a'/%3E%3Cpath d='M16 9q1-4 4-6' stroke='%235b3b22' stroke-width='2' fill='none'/%3E%3Cellipse cx='22' cy='6' rx='4' ry='2' fill='%234c8a3c'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-tree">
+<main id="app" class="app"><p class="loading">숲을 불러오는 중…</p></main>
+<div class="note-wrap" id="note" hidden>
+  <div class="note" role="dialog" aria-modal="true" aria-labelledby="note-q">
+    <div class="note-meta" id="note-meta"></div>
+    <p class="note-q" id="note-q"></p>
+    <p class="note-teacher" id="note-teacher"></p>
+    <div class="note-nav">
+      <button type="button" class="ghost sm" id="note-prev">이전 열매</button>
+      <span id="note-pos"></span>
+      <button type="button" class="ghost sm" id="note-next">다음 열매</button>
+      <button type="button" class="primary" id="note-close">닫기</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script type="module" src="js/tree.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// 질문나무 보안 규칙. Firebase 콘솔 → Firestore Database → 규칙 탭에 통째로 붙여 넣고 '게시'.
+//
+// 저장 구조
+//   meta/lock                          설치가 끝났다는 표시. 있으면 다시 설치할 수 없다.
+//   adminKeys/{교사키}                  { classId }  교사 링크의 키. 지우면 그 링크가 막힌다.
+//   classes/{반코드}/public/config      { settings, students }  학생 링크로 읽기만
+//   classes/{반코드}/forests/{YYYY-MM}  { fruits: { 질문id: {...} } }  한 달의 숲. 학생 링크로 읽기만
+//   classes/{반코드}/questions/{id}     원본 질문. 학생은 '새로 보내기'만, 읽기·고치기는 교사만
+//   classes/{반코드}/private/sheet      구글 시트 주소와 토큰. 교사만
+//   classes/{반코드}/admins/{uid}       교사 링크를 연 기기(익명 로그인) { key }
+//
+// 링크 속 반 코드·교사 키가 열쇠다. 그래서 목록 조회(list)는 어디서도 허락하지 않는다.
+// 목록이 열리면 열쇠를 몰라도 다른 반의 코드를 알아낼 수 있다.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function lockPath() { return /databases/$(database)/documents/meta/lock; }
+    function keyPath(k) { return /databases/$(database)/documents/adminKeys/$(k); }
+    function configPath(c) { return /databases/$(database)/documents/classes/$(c)/public/config; }
+    function adminPath(c) { return /databases/$(database)/documents/classes/$(c)/admins/$(request.auth.uid); }
+
+    // 설치하는 한 묶음 안에서만 참: 잠금이 지금은 없고, 이 묶음이 끝나면 생긴다.
+    function inSetup() { return !exists(lockPath()) && existsAfter(lockPath()); }
+
+    // 이 기기가 반 c 의 교사인가: 기기 기록이 있고, 거기 적힌 키가 아직 살아 있고, 그 키가 이 반 것이어야 한다.
+    // 교사 링크를 새로 만들면 옛 키가 지워지므로 옛 링크로 등록한 기기는 여기서 막힌다.
+    function isAdmin(c) {
+      return request.auth != null
+        && exists(adminPath(c))
+        && exists(keyPath(get(adminPath(c)).data.key))
+        && get(keyPath(get(adminPath(c)).data.key)).data.classId == c;
+    }
+
+    // 학생이 보내는 질문의 모양
+    function studentQuestion(c) {
+      let d = request.resource.data;
+      let cfg = get(configPath(c)).data;
+      return d.keys().hasOnly(['sid', 'text', 'topic', 'date', 'askedAt', 'status'])
+        && d.keys().hasAll(['sid', 'text', 'date', 'askedAt', 'status'])
+        && d.status == 'pending'
+        && d.askedAt == request.time
+        && d.text is string && d.text.size() >= 1 && d.text.size() <= 200
+        && (!('topic' in d) || (d.topic is string && d.topic.size() <= 30))
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.sid is string
+        && cfg.settings.get('open', true) == true
+        && d.sid in cfg.students
+        && cfg.students[d.sid].get('hidden', false) != true;
+    }
+
+    match /meta/lock {
+      allow get: if true;
+      allow create: if request.auth != null;
+    }
+
+    match /adminKeys/{k} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if k.size() >= 20
+        && request.resource.data.keys().hasOnly(['classId', 'at'])
+        && request.resource.data.classId is string
+        && (inSetup() || isAdmin(request.resource.data.classId));
+      allow delete: if isAdmin(resource.data.classId);
+    }
+
+    match /classes/{c} {
+      match /public/{d} {
+        allow get: if true;
+        allow list: if false;
+        allow create: if (inSetup() && c.size() >= 16) || isAdmin(c);
+        allow update: if isAdmin(c);
+      }
+
+      match /forests/{m} {
+        allow get: if true;
+        allow list: if false;
+        allow create, update, delete: if isAdmin(c);
+      }
+
+      match /questions/{q} {
+        allow create: if isAdmin(c) || studentQuestion(c);
+        allow get, list, update, delete: if isAdmin(c);
+      }
+
+      match /private/{d} {
+        allow get, create, update, delete: if isAdmin(c);
+      }
+
+      match /admins/{uid} {
+        allow get: if request.auth != null && request.auth.uid == uid;
+        // 교사 키를 아는 기기만 자기를 등록할 수 있다. 설치 묶음에서는 키도 같이 만들어지므로 getAfter 로 본다.
+        allow create, update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['key', 'at'])
+          && request.resource.data.key is string
+          && existsAfter(keyPath(request.resource.data.key))
+          && getAfter(keyPath(request.resource.data.key)).data.classId == c;
+      }
+    }
+  }
+}
