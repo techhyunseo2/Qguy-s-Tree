@@ -14,10 +14,12 @@ test('페이지가 부르는 css·js 가 모두 있다', () => {
   }
 });
 
-test('모든 페이지가 주소(열쇠)를 바깥에 흘리지 않고 검색에도 안 잡힌다', () => {
+test('모든 페이지가 주소(열쇠)를 바깥에 흘리지 않고, API 키 제한과도 맞고, 검색에도 안 잡힌다', () => {
   for (const p of pages) {
     const html = read(p);
-    assert.match(html, /name="referrer" content="no-referrer"/, p);
+    // strict-origin: 다른 사이트에는 'https://주소/' 까지만 보낸다. 링크의 ?k=·?c= 열쇠는 나가지 않는다.
+    // no-referrer 로 바꾸면 안 된다 — Google Cloud 에서 API 키를 사이트 주소로 제한했을 때 Firebase 요청이 전부 거절된다.
+    assert.match(html, /name="referrer" content="strict-origin"/, p);
     assert.match(html, /name="robots" content="noindex/, p);
   }
 });

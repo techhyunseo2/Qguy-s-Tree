@@ -44,6 +44,7 @@ tests/ui-smoke.mjs                Chrome 원격 조종으로 클릭 흐름 점�
 - **`[hidden]{display:none!important}`** 를 css 에서 빼지 말 것. 쪽지·알림이 `display` 를 갖고 있어 hidden 이 무시되고 닫힌 쪽지가 떠 있었다(실제로 겪음).
 - 구글 시트: Apps Script 웹 앱에 `fetch(POST, 글 본문)` — 머리글을 붙이면 사전 확인(preflight)이 생겨 막힌다. **학년도마다 탭**(`2026학년도`). '다시 쓰기'는 올해 탭만 비운다. 학생을 지워도 시트 줄은 남긴다(보관용 기록). 못 보낸 변경은 질문 문서의 `sheetDirty` 로 표시해 다음 접속 때 다시 보낸다.
 - 학년도 = 3월~이듬해 2월 (`schoolYearOf`).
+- **referrer 는 `strict-origin`.** 처음엔 `no-referrer` 였는데, GitHub 가 API 키 감지 메일을 보내 Google Cloud 에서 키를 사이트 주소(HTTP referrer)로 제한하기로 하면서 바꿨다. no-referrer 면 Referer 가 안 가서 제한된 키로 Firebase 요청이 전부 거절된다. strict-origin 은 출처만 보내므로 링크의 ?k=/?c= 열쇠는 여전히 새지 않는다. 시험이 지킨다.
 
 ## 검증 상태
 

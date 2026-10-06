@@ -1,6 +1,8 @@
 // Firebase 콘솔 → 프로젝트 설정 → 내 앱(웹)에 나오는 값을 그대로 붙여 넣으세요. (설치안내 4단계)
 // 이 값들은 비밀이 아닙니다. 웹 페이지에 그대로 드러나도록 만들어진 값이고,
 // 데이터를 지키는 것은 firestore.rules(보안 규칙)입니다.
+// GitHub 가 "Google API Key 감지" 메일을 보내는 것은 정상입니다. 대신 Google Cloud 에서
+// 이 키를 우리 사이트 주소에서만 쓰이도록 제한해 두세요. (설치안내 4단계의 'API 키 제한하기')
 export const firebaseConfig = {
   apiKey: "AIzaSyBL2YLYZb8WU-UH8l37CQ0K5-KVd0mkPxQ",
   authDomain: "qguy-s-tree.firebaseapp.com",
