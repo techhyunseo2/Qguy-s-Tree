@@ -47,6 +47,12 @@ tests/ui-smoke.mjs                Chrome 원격 조종으로 클릭 흐름 점�
 - **학년(grade)**: 학생마다 `grade`, **1~3학년만**(`GRADES`, 사용자 요청 — 중학교). 붙여넣기에서 범위 밖 줄은 넣지 않고 칸에 남긴다. 학년을 넣기 전에 만든 명단은 칸이 없어 `studentList` 가 1학년으로 채운다. 반 탭은 학년을 하나 골랐을 때만(전체 학년의 '2반'은 뜻이 없다). `?g=` 는 처음 고를 학년일 뿐 접근 제한이 아니다. 기록 표에 '학년' 칸이 들어가 시트 코드 판을 `SCRIPT_VERSION` 2 로 올렸다 — 저장된 판이 다르면 보내기를 멈추고(`sheetOk`) 다시 연결하라고 한다. HEAD 를 바꾸면 이 판도 올릴 것.
 - **referrer 는 `strict-origin`.** 처음엔 `no-referrer` 였는데, GitHub 가 API 키 감지 메일을 보내 Google Cloud 에서 키를 사이트 주소(HTTP referrer)로 제한하기로 하면서 바꿨다. no-referrer 면 Referer 가 안 가서 제한된 키로 Firebase 요청이 전부 거절된다. strict-origin 은 출처만 보내므로 링크의 ?k=/?c= 열쇠는 여전히 새지 않는다. 시험이 지킨다.
 
+## 배포
+
+- **페이지**(html·js·css): GitHub Pages. 사용자가 GitHub Desktop 으로 푸시하면 반영. 주소 https://techhyunseo2.github.io/Qguy-s-Tree/
+- **보안 규칙**만 Firebase 에 배포한다: `npx firebase deploy --only firestore:rules --project qguy-s-tree`. CLI 는 이 PC 에 `kesco0305@gmail.com` 으로 로그인돼 있다. 올리기 전에 `--dry-run` 으로 서버 컴파일을 먼저 본다.
+- 2026-10-14 첫 CLI 배포: 서버 컴파일 통과, 콘솔에 게시된 규칙과 같아 "already up to date". Firebase Hosting 은 쓰지 않는다(firebase.json 에 hosting 없음).
+
 ## 검증 상태
 
 - `node --test tests/*.test.js` 39개 통과, `ui-smoke` 13개 통과.

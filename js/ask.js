@@ -1,6 +1,6 @@
 // 질문 등록 화면 (ask.html?c=반코드)
 import { $, esc, today, param, studentList, sortStudents, gradesOf, bansOf, withDefaults, fatal, errorText, keepFocus, typingIn } from './common.js';
-import { treeSVG } from './tree-draw.js';
+import { treeSVG, SEASONS } from './tree-draw.js';
 import * as store from './store.js';
 
 const app = $('#app');
@@ -18,6 +18,7 @@ function requestRender() {
 function view() {
   const st = withDefaults(S.cfg.settings);
   document.title = `질문 남기기 · ${st.title}`;
+  document.body.style.setProperty('--sky', (SEASONS[st.season] || SEASONS.spring).sky);
   let h = `<div class="ask-card"><div><div class="kicker">${esc(st.title)}</div><h1 class="title">질문 남기기</h1><p class="muted">수업 시간에 떠오른 질문을 적어 주세요. 선생님이 확인하면 이번 달 내 나무에 열매가 열립니다.</p></div>`;
   if (!st.open) return h + `<div class="closed"><b>지금은 질문을 받지 않고 있어요.</b><p class="muted">선생님이 다시 열면 남길 수 있습니다.</p></div></div>`;
   if (S.sent) return h + `<div class="sent">${treeSVG('sent', [{ id: 'x', text: '' }], { season: st.season, fruit: st.fruit })}<p class="sent-t">질문을 보냈어요</p><p class="muted">선생님이 읽고 승인하면 질문나무에 열매로 열립니다.</p><button type="button" class="ghost" id="again">질문 하나 더 남기기</button></div></div>`;
