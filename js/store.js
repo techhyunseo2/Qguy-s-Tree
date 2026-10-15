@@ -90,10 +90,10 @@ export async function approve(c, q, { text, note, star }, sheetOn) {
   return fruit;
 }
 
-/** 수업 중에 들은 질문을 선생님이 바로 열매로. */
-export async function addApproved(c, { sid, text, date }, sheetOn) {
+/** 수업 중에 들은 질문을 선생님이 바로 열매로. 과목·한마디·빛나는 질문도 함께 정할 수 있다. */
+export async function addApproved(c, { sid, text, topic = '', note = '', star = false, date }, sheetOn) {
   const ref = doc(P.questions(c));
-  const fruit = { sid, text, topic: '', date, note: '', star: false, approved: date };
+  const fruit = { sid, text, topic, date, note, star: !!star, approved: date };
   const b = writeBatch(db);
   b.set(ref, { ...fruit, status: 'approved', byTeacher: true, askedAt: serverTimestamp(), approvedAt: serverTimestamp(), ...dirty(sheetOn) });
   b.set(P.forest(c, monthOf(date)), { fruits: { [ref.id]: fruit } }, { merge: true });

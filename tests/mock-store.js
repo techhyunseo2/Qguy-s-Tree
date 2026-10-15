@@ -64,8 +64,8 @@ export async function approve(c, q, { text, note, star }) {
   db.questions[q.id] = { ...db.questions[q.id], ...f, status: 'approved' };
   emit(); return f;
 }
-export async function addApproved(c, { sid, text, date }) {
-  const id = 'd' + randKey(6), f = { sid, text, topic: '', date, note: '', star: false, approved: date };
+export async function addApproved(c, { sid, text, topic = '', note = '', star = false, date }) {
+  const id = 'd' + randKey(6), f = { sid, text, topic, date, note, star: !!star, approved: date };
   (db.forests[monthOf(date)] ||= {})[id] = f; db.questions[id] = { ...f, status: 'approved' };
   emit(); return { id, ...f };
 }

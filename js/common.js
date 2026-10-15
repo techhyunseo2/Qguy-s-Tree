@@ -44,6 +44,9 @@ export const real = s => s ? `${s.grade}학년 ${s.ban}반 ${s.num}번 ${s.name}
 /** 설정 문서의 students 지도 → 배열. 빠진 칸은 기본값으로 채운다(학년을 넣기 전에 만든 명단은 1학년). */
 export const studentList = map => Object.entries(map || {}).map(([id, s]) => ({ id, grade: 1, ban: 1, num: 0, name: '', hidden: false, ...s }));
 
+/** 과목 고르기 목록의 기본 칸. 목록에 없는 과목·단원은 직접 적을 수 있다. */
+export const SUBJECTS = ['국어', '수학', '영어', '과학', '사회', '역사', '도덕', '기술·가정', '정보', '음악', '미술', '체육', '진로'];
+
 /** 쓰는 학년. 중학교라 1~3학년만 받는다. */
 export const GRADES = [1, 2, 3];
 export const isGrade = g => GRADES.includes(g);

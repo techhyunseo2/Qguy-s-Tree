@@ -2,7 +2,7 @@
 //   1) node tests/serve.mjs        (다른 창에서 켜 둔다)
 //   2) node tests/ui-smoke.mjs     → 통과/실패를 적고, 화면 사진을 tests/shots/ 에 남긴다
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -13,9 +13,12 @@ const shots = join(import.meta.dirname, 'shots');
 mkdirSync(shots, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const port = 9333;
-const proc = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', `--remote-debugging-port=${port}`,
-  `--user-data-dir=${join(tmpdir(), 'qtree-smoke-' + Date.now())}`, '--window-size=1200,1000', 'about:blank'], { stdio: 'ignore' });
+// 포트는 Chrome 이 빈 것을 고르게 한다(0). 고정 포트(9333)는 다른 프로그램이 차지해 실패한 적이 있다.
+// 고른 포트는 프로필 폴더의 DevToolsActivePort 첫 줄에 적힌다.
+const profile = join(tmpdir(), 'qtree-smoke-' + Date.now());
+let port = 0;
+const proc = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=0',
+  `--user-data-dir=${profile}`, '--window-size=1200,1000', 'about:blank'], { stdio: 'ignore' });
 
 let ws, seq = 0;
 const pending = new Map();
@@ -27,6 +30,7 @@ function cdp(method, params = {}) {
 async function connect() {
   for (let i = 0; i < 50; i++) {
     try {
+      if (!port) port = +readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
       const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
       const page = list.find(t => t.type === 'page');
       if (page) {
@@ -171,6 +175,27 @@ try {
     expect(r.rows2 === 1, `2학년만 거른 기록 줄 ${r.rows2} (1이어야 함)`);
   });
   await shot('admin-record');
+
+  await check('교사: 바로 열매 달기에 과목·한마디·빛나는 질문이 함께 들어가고, 과목은 다음 질문을 위해 남는다', async () => {
+    await open('admin.html?k=x#approved');
+    const r = await js(`${H}
+      const opts = [...document.querySelectorAll('#topic-list option')].map(o => o.value);
+      const sel = $('#direct-student'); sel.value = sel.options[1].value; sel.dispatchEvent(new Event('change', { bubbles: true }));
+      type($('#direct-topic'), '과학 · 날씨');
+      type($('#direct-text'), '구름은 왜 떠 있나요?');
+      type($('#direct-note'), '관찰에서 나온 질문!');
+      const st = $('#direct-star'); st.checked = true; st.dispatchEvent(new Event('change', { bubbles: true }));
+      $('#direct-form').requestSubmit(); await wait(400);
+      const row = $$('.q-row').find(x => x.textContent.includes('구름은 왜 떠 있나요?'));
+      click($('#tab-record')); await wait(100);
+      const rec = $$('.rec tbody tr').map(tr => tr.textContent).find(t => t.includes('구름은'));
+      click($('#tab-approved')); await wait(100);
+      return { opts, row: row ? row.textContent : '', rec: rec || '', topicLeft: $('#direct-topic').value, textLeft: $('#direct-text').value, starLeft: $('#direct-star').checked };`);
+    expect(['과학', '체육', '과학 · 빛'].every(o => r.opts.includes(o)), '과목 목록에 기본 과목·쓴 과목이 없음: ' + r.opts);
+    expect(r.row.includes('과학 · 날씨') && r.row.includes('한마디 · 관찰에서 나온 질문!') && r.row.includes('빛나는 질문'), '열린 열매에 과목·한마디·별이 없음: ' + r.row);
+    expect(r.rec.includes('과학 · 날씨') && r.rec.includes('관찰에서 나온 질문!') && r.rec.includes('★'), '기록 표에 안 들어감: ' + r.rec);
+    expect(r.topicLeft === '과학 · 날씨' && r.textLeft === '' && r.starLeft === false, '달고 난 뒤 칸 정리가 다름 ' + JSON.stringify(r));
+  });
 
   await check('교사: 입력하는 동안 실시간 갱신이 와도 쓰던 글이 남는다', async () => {
     // 승인 카드는 초안(drafts)으로 지켜지지만, 명단 이름 칸은 초안이 없다. 갱신을 미루는 장치만이 지킨다.

@@ -1,5 +1,5 @@
 // 교사 화면 (admin.html?k=교사키): 검토 · 열린 열매 · 보류 · 기록 · 설정
-import { $, esc, fmt, today, monthOf, mLabel, monthsSoFar, schoolYearOf, param, real, studentList, sortStudents, gradesOf, GRADES, isGrade,
+import { $, esc, fmt, today, monthOf, mLabel, monthsSoFar, schoolYearOf, param, real, studentList, sortStudents, gradesOf, GRADES, isGrade, SUBJECTS,
   parseRoster, withDefaults, DEFAULT_TITLE, toast, fatal, errorText, copyText, randKey, typingIn, keepFocus } from './common.js';
 import { treeSVG, SEASONS, FRUITS } from './tree-draw.js';
 import * as store from './store.js';
@@ -12,7 +12,7 @@ const S = {
   k: param('k'), c: '', cfg: null, inbox: [], forests: {}, months: monthsSoFar(NOW),
   tab: TABS.some(([t]) => '#' + t === location.hash) ? location.hash.slice(1) : 'pending',
   apprMonth: CUR, apprFilter: '', apprGrade: 0, recMonth: '', recGrade: 0, pasteGrade: 0,
-  drafts: {}, paste: '', direct: { sid: '', text: '' }, confirm: null, busy: new Set(), deferred: false,
+  drafts: {}, paste: '', direct: { sid: '', topic: '', text: '', note: '', star: false }, confirm: null, busy: new Set(), deferred: false,
   sheet: null, sheetDraft: null, sheetError: '', lastSync: null
 };
 
@@ -36,6 +36,12 @@ const links = () => {
 };
 /** 학년이 없는 붙여넣기 줄의 학년: 고른 값, 없으면 명단의 첫 학년, 그것도 없으면 1학년. */
 const pasteGrade = () => S.pasteGrade || grades().find(isGrade) || 1;
+/** 과목 고르기 목록: 기본 과목 + 지금까지 쓴 과목(학생이 적은 것, 선생님이 적은 것). */
+function topicList() {
+  const used = [...allFruits(), ...S.inbox].map(x => (x.topic || '').trim()).filter(Boolean);
+  const all = [...new Set([...SUBJECTS, ...used.sort((a, b) => a.localeCompare(b, 'ko'))])];
+  return `<datalist id="topic-list">${all.map(t => `<option value="${esc(t)}"></option>`).join('')}</datalist>`;
+}
 const empty = (t, d) => `<div class="empty"><b>${t}</b><p class="muted">${d}</p></div>`;
 const busy = id => S.busy.has(id) ? 'disabled' : '';
 const studentOptions = (sel = '') => sortStudents(studentList(studentsMap()).filter(s => !s.hidden), 'num')
@@ -81,9 +87,15 @@ function approvedView() {
   const f = S.apprFilter, m = S.apprMonth, g = S.apprGrade;
   const list = allFruits().filter(x => (!f || x.sid === f) && (!m || monthOf(x.date) === m) && (!g || (stu(x.sid)?.grade ?? 1) === g))
     .sort((a, b) => b.date.localeCompare(a.date) || String(b.approved).localeCompare(String(a.approved)));
-  let h = `<form class="direct" id="direct-form"><div class="field who-pick"><label for="direct-student">학생</label><select id="direct-student"><option value="">학생 고르기</option>${studentOptions(S.direct.sid)}</select></div>
-    <div class="field grow"><label for="direct-text">수업 중에 말로 한 질문</label><input id="direct-text" maxlength="200" value="${esc(S.direct.text)}" placeholder="선생님이 들은 질문을 바로 이번 달 열매로 달 수 있습니다" autocomplete="off"></div>
-    <button class="primary" type="submit" ${busy('direct')}>바로 열매 달기</button></form>
+  const d = S.direct;
+  let h = `<form class="direct" id="direct-form">
+    <div class="direct-head"><b>선생님이 바로 열매 달기</b><span class="muted small">수업 중에 말로 한 좋은 질문을 이번 달 열매로 답니다</span></div>
+    <div class="field"><label for="direct-student">학생</label><select id="direct-student"><option value="">학생 고르기</option>${studentOptions(d.sid)}</select></div>
+    <div class="field"><label for="direct-topic">과목 <span class="lbl-note">(목록에서 고르거나 직접 적기)</span></label><input id="direct-topic" list="topic-list" maxlength="30" value="${esc(d.topic)}" placeholder="예: 과학 · 지구와 달" autocomplete="off">${topicList()}</div>
+    <div class="field span-all"><label for="direct-text">질문</label><input id="direct-text" maxlength="200" value="${esc(d.text)}" placeholder="학생이 한 질문을 그대로 적어 주세요" autocomplete="off"></div>
+    <div class="field span-all"><label for="direct-note">선생님 한마디 <span class="lbl-note">(선택 · 열매를 열면 함께 보여요)</span></label><input id="direct-note" maxlength="60" value="${esc(d.note)}" placeholder="예: 원인과 결과를 나눠 생각한 좋은 질문!" autocomplete="off"></div>
+    <div class="span-all direct-foot"><label class="toggle"><input type="checkbox" id="direct-star" ${d.star ? 'checked' : ''}> 빛나는 질문으로 달기</label><button class="primary" type="submit" ${busy('direct')}>바로 열매 달기</button></div>
+  </form>
     <div class="row-between"><div class="filters"><div class="field"><label for="appr-month">달</label><select id="appr-month">${monthOptions(m, `${SY}학년도 전체`)}</select></div>${gradeFilter('appr-grade', g)}<div class="field"><label for="appr-filter">학생</label><select id="appr-filter"><option value="">모든 학생</option>${studentOptions(f)}</select></div></div><p class="muted">열매 ${list.length}개</p></div>`;
   if (!list.length) return h + empty('이 조건에 맞는 열매가 없습니다', '검토 대기에서 질문을 승인하면 여기에 모입니다.');
   return h + `<div class="q-list">${list.map(x => `<div class="q-row"><div class="q-row-main"><div class="q-meta"><b>${esc(real(stu(x.sid)))}</b>${x.topic ? `<span class="chip">${esc(x.topic)}</span>` : ''}<time>${fmt(x.date)}</time>${x.star ? '<span class="chip gold">빛나는 질문</span>' : ''}</div><p>${esc(x.text)}</p>${x.note ? `<p class="tnote">한마디 · ${esc(x.note)}</p>` : ''}</div>
@@ -371,6 +383,8 @@ app.addEventListener('input', e => {
   if (t.id === 'set-perRow') $('#perrow-out').textContent = t.value;
   if (t.id === 'paste-box') S.paste = t.value;
   if (t.id === 'direct-text') S.direct.text = t.value;
+  if (t.id === 'direct-topic') S.direct.topic = t.value;
+  if (t.id === 'direct-note') S.direct.note = t.value;
   if (t.id === 'sheet-url' && S.sheetDraft) S.sheetDraft.url = t.value;
 });
 app.addEventListener('change', e => {
@@ -383,6 +397,8 @@ app.addEventListener('change', e => {
   else if (id === 'paste-grade') { S.pasteGrade = +t.value; return; }
   else if (id === 'rec-month') S.recMonth = t.value;
   else if (id === 'direct-student') { S.direct.sid = t.value; return; }
+  else if (id === 'direct-star') { S.direct.star = t.checked; return; }
+  else if (id === 'direct-topic' || id === 'direct-text' || id === 'direct-note') return;
   else if (t.name === 'season' || t.name === 'fruit') save({ [t.name]: t.value });
   else if (id === 'set-title') save({ title: t.value.trim() || DEFAULT_TITLE });
   else if (id === 'set-perRow') save({ perRow: +t.value });
@@ -407,12 +423,13 @@ app.addEventListener('change', e => {
 app.addEventListener('submit', e => {
   e.preventDefault();
   if (e.target.id !== 'direct-form') return;
-  const sid = S.direct.sid, text = S.direct.text.trim();
+  const d = S.direct, sid = d.sid, text = d.text.trim();
   if (!sid || !text) return toast('학생을 고르고 질문을 적어 주세요');
   run('direct', async () => {
-    const r = await store.addApproved(S.c, { sid, text, date: NOW }, sheetOn());
-    S.direct.text = '';
-    toast(`${stu(sid)?.name || ''}의 ${mLabel(CUR)} 나무에 열매가 열렸습니다`, treeAction);
+    const r = await store.addApproved(S.c, { sid, text, topic: d.topic.trim(), note: d.note.trim(), star: d.star, date: NOW }, sheetOn());
+    // 같은 수업에서 여러 개를 연달아 다는 일이 많아 과목은 남기고 나머지만 비운다
+    Object.assign(S.direct, { text: '', note: '', star: false });
+    toast(`${stu(sid)?.name || ''}의 ${mLabel(CUR)} 나무에 ${r.star ? '빛나는 ' : ''}열매가 열렸습니다`, treeAction);
     syncOps([upsertOp(r.id, r, stu(sid))], [r.id]);
   });
 });
